@@ -47,5 +47,5 @@ func ToStorage(markdown []byte) (string, error) {
 	if err := defaultMarkdown.Convert(markdown, &buf); err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	return restoreCodeCells(buf.String())
 }
