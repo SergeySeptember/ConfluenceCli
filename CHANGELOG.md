@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Export keeps the blank boundary between a table and a following list. Import also separates lists immediately following bordered pipe tables, preserving resumed numbering and nested items instead of adding them as table rows.
+- Export keeps the blank boundary between a table and a following list. Export and import nest dedented pipe tables in their introducing list items when the ordered sequence continues, keeping one continuous list even when Confluence discards an `ol` start attribute. Independent following lists receive a blank separator instead of becoming table rows.
 
 - Bold and italic labels in local page links restore as rich Confluence link bodies instead of displaying literal Markdown markers.
 

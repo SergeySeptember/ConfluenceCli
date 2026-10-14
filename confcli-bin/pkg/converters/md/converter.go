@@ -46,7 +46,7 @@ func ToStorage(markdown []byte) (string, error) {
 		return "", nil
 	}
 	var buf bytes.Buffer
-	markdown = []byte(markdownutil.SeparateTableLists(string(markdown)))
+	markdown = []byte(markdownutil.NormalizeTableLists(string(markdown)))
 	if err := defaultMarkdown.Convert(markdown, &buf); err != nil {
 		return "", err
 	}

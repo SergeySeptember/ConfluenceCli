@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"confcli/pkg/markdownutil"
+
 	html2md "github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/commonmark"
@@ -2029,6 +2031,7 @@ func storageToMarkdownCore(storageContent string, baseURL string) (string, error
 	markdown = RemoveMarkdownEscaping(markdown)
 	// Strip any <details>/<summary> tags that leak through from export_view HTML
 	markdown = stripDetailsElements(markdown)
+	markdown = markdownutil.NormalizeTableLists(markdown)
 
 	return markdown, nil
 }

@@ -2,6 +2,7 @@ package markdownutil
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -10,6 +11,91 @@ import (
 )
 
 var tableFollowingList = regexp.MustCompile(`^[ \t]*(?:[-*+]|[0-9]+[.)])[ \t]+`)
+var tableListItem = regexp.MustCompile(`^([ \t]*)([0-9]{1,9}[.)]|[-*+])([ \t]+)(.*)$`)
+
+// NormalizeTableLists keeps tables within the list items that introduce them.
+// A dedented pipe table followed by a higher-numbered item resumes the same
+// ordered list. Nesting the table keeps numbering continuous even in renderers
+// that discard the start attribute of a new <ol>, including Confluence.
+func NormalizeTableLists(source string) string {
+	lines := strings.Split(source, "\n")
+	masked := strings.Split(maskTableSource(source), "\n")
+	for i := 1; i < len(lines); i++ {
+		if !strings.HasPrefix(strings.TrimSpace(masked[i-1]), "|") || !isTableDelimiter(strings.TrimSpace(masked[i])) {
+			continue
+		}
+		start, end := i-1, i+1
+		for end < len(lines) && strings.HasPrefix(strings.TrimSpace(masked[end]), "|") {
+			end++
+		}
+		next := end
+		for next < len(lines) && strings.TrimSpace(masked[next]) == "" {
+			next++
+		}
+		if next == len(lines) {
+			continue
+		}
+		following := tableListItem.FindStringSubmatch(masked[next])
+		if following == nil {
+			continue
+		}
+		nextOrdered := following[2][0] >= '0' && following[2][0] <= '9'
+		nextIndent := tableLineIndent(following[1])
+		nextNumber, _ := strconv.Atoi(following[2][:len(following[2])-1])
+		previous := start - 1
+		for previous >= 0 && strings.TrimSpace(masked[previous]) == "" {
+			previous--
+		}
+		if previous < 0 {
+			continue
+		}
+		item := tableListItem.FindStringSubmatch(masked[previous])
+		if item == nil || tableLineIndent(item[1]) < nextIndent {
+			continue
+		}
+		indent := tableLineIndent(item[1]) + len(item[2]) + 1
+		// Find the enclosing ordered item at the continuation's depth, without
+		// crossing another table, heading or independent paragraph.
+		continued := false
+		for j := previous; j >= 0; j-- {
+			line := strings.TrimSpace(masked[j])
+			if line == "" {
+				continue
+			}
+			parent := tableListItem.FindStringSubmatch(masked[j])
+			if parent != nil {
+				parentIndent := tableLineIndent(parent[1])
+				parentOrdered := parent[2][0] >= '0' && parent[2][0] <= '9'
+				if nextOrdered && parentIndent == nextIndent {
+					if parentOrdered {
+						number, _ := strconv.Atoi(parent[2][:len(parent[2])-1])
+						continued = nextNumber > number
+					}
+					break
+				}
+				if !nextOrdered && parentOrdered && parentIndent < nextIndent {
+					continued = nextIndent >= parentIndent+len(parent[2])+1
+					break
+				}
+			}
+			if strings.HasPrefix(line, "#") || (parent == nil && tableLineIndent(masked[j]) <= nextIndent) {
+				break
+			}
+		}
+		if !continued || tableLineIndent(masked[start]) >= indent {
+			continue
+		}
+		for j := start; j < end; j++ {
+			padding := indent - tableLineIndent(masked[j])
+			if padding > 0 {
+				lines[j] = strings.Repeat(" ", padding) + lines[j]
+				masked[j] = strings.Repeat(" ", padding) + masked[j]
+			}
+		}
+		i = end - 1
+	}
+	return SeparateTableLists(strings.Join(lines, "\n"))
+}
 
 // SeparateTableLists keeps a list immediately following a pipe table from being
 // parsed as more table rows. Only an explicit table header/delimiter and bordered
