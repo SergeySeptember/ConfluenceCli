@@ -876,7 +876,9 @@ func fixEmptyListWrappers(markdown string) string {
 		// Only trigger on non-empty, non-list-item, non-heading lines.
 		// Headings deliberately keep their surrounding blank lines.
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || listItemIndentRe.MatchString(line) || strings.HasPrefix(trimmed, "#") {
+		// A table needs its blank separator before a following list. Removing
+		// it makes the list items render as additional table rows.
+		if trimmed == "" || listItemIndentRe.MatchString(line) || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "|") {
 			continue
 		}
 

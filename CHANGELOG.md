@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Export keeps the blank boundary between a table and a following list. Import also separates lists immediately following bordered pipe tables, preserving resumed numbering and nested items instead of adding them as table rows.
+
 - Bold and italic labels in local page links restore as rich Confluence link bodies instead of displaying literal Markdown markers.
 
 - Macro-preserving exports retain code-example titles and collapse settings, including code inside table cells. Imports restore these settings without breaking following rows or document sections. Simple nested ordered lists retain their alphabetic/roman markers through HTML.

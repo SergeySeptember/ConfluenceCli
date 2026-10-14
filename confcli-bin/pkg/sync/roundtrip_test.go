@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/html"
+
 	"confcli/pkg/converters"
 	"confcli/pkg/transforms"
 )
@@ -157,6 +159,69 @@ func TestImportProfileRestoresNestedMacros(t *testing.T) {
 	assertStorageXML(t, storage)
 	if !strings.Contains(storage, `ac:name="expand"`) || !strings.Contains(storage, `ac:name="include"`) || !strings.Contains(storage, `<strong>Body</strong>`) {
 		t.Fatalf("import profile was not applied: %s", storage)
+	}
+}
+
+func TestTableInExpandedListItemKeepsFollowingSteps(t *testing.T) {
+	source := `<ol start="6"><li>Check request</li><li><p>Add details:</p><ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">Details</ac:parameter><ac:rich-text-body><table><tr><th>Field</th><th>Value</th></tr><tr><td>bankId</td><td>Identifier</td></tr></table></ac:rich-text-body></ac:structured-macro></li><li>Find receiver<ul><li>Use identifier</li></ul></li><li>Send response</li></ol>`
+	prepared, restore, err := converters.PrepareRoundTripExport(source, "", converters.RoundTripOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown, err := converters.StorageToMarkdownAdvanced(prepared, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := transforms.LoadImportProfile([]byte("kind: import\ntransforms:\n  - type: restore_macro\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	convert, err := NewProfileMarkdownConverter(profile, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage, err := convert(context.Background(), []byte(restore(markdown)), "source.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStorageXML(t, storage)
+	doc, err := html.Parse(strings.NewReader(storage))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, listItems, expands := 0, 0, 0
+	var walk func(*html.Node, bool, bool)
+	walk = func(n *html.Node, inTable, inExpand bool) {
+		if n.Data == "ac:structured-macro" {
+			for _, a := range n.Attr {
+				if a.Key == "ac:name" && a.Val == "expand" {
+					inExpand = true
+					expands++
+				}
+			}
+		}
+		if n.Data == "table" {
+			inTable = true
+			if !inExpand {
+				t.Fatalf("table escaped its Expand: %s", storage)
+			}
+		}
+		if n.Data == "tr" {
+			rows++
+		}
+		if n.Data == "li" {
+			listItems++
+		}
+		if n.Type == html.TextNode && (strings.Contains(n.Data, "Find receiver") || strings.Contains(n.Data, "Send response")) && (inTable || inExpand) {
+			t.Fatalf("following step swallowed by table or Expand: %s", storage)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c, inTable, inExpand)
+		}
+	}
+	walk(doc, false, false)
+	if rows != 2 || listItems != 5 || expands != 1 || !strings.Contains(storage, `<ol start="6">`) {
+		t.Fatalf("list/table structure changed: %s", storage)
 	}
 }
 

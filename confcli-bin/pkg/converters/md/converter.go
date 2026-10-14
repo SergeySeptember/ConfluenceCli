@@ -14,6 +14,8 @@ package md
 import (
 	"bytes"
 
+	"confcli/pkg/markdownutil"
+
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -44,6 +46,7 @@ func ToStorage(markdown []byte) (string, error) {
 		return "", nil
 	}
 	var buf bytes.Buffer
+	markdown = []byte(markdownutil.SeparateTableLists(string(markdown)))
 	if err := defaultMarkdown.Convert(markdown, &buf); err != nil {
 		return "", err
 	}
